@@ -1,10 +1,6 @@
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Scanner;
+import java.sql.* ;
 
 //声明//
 public class Student {
@@ -22,31 +18,42 @@ public class Student {
         System.out.println ( "名字" + name + "，分数" + score + "录入成功" );
     }
 
-    //
+    //录入方法
     public static Student readStudent ( Scanner sc ) {
         System.out.println ( "名字？" );
         String name = sc.nextLine ( );
 
-        System.out.println ( "告诉我他的分数，让我康康他的分数发育正不正常啊" );
+        System.out.println ( "告诉我他的分数，让我康康他的发育正不正常啊" );
         double score = sc.nextDouble ( );
         sc.nextLine ( );
 
         return new Student ( name , score );
     }
 
-    //录取地址
-    public static File dataFile () {
-        String home = System.getProperty ( "user.home" );
-        return new File ( home , "student.txt" );
-    }
+    //原录取地址，水字数用
+//    public static File dataFile () {
+//        String home = System.getProperty ( "user.home" );
+//        return new File ( home , "student.txt" );
+//    }
 
+    //唯一一处链接数据库的地方
+    private static Connection getConnection () throws Exception {
+        String url = "jdbc:mysql://localhost:3306/lab?useSSL=false&characterEncoding=utf8&serverTimezone=Asia/Shanghai" ;
+        return DriverManager.getConnection (url,"root","lab123456" ) ;
+    }
     //保存数据
     public static void saveStudents ( ArrayList<Student> students ) {
-        try (FileWriter writer = new FileWriter ( dataFile ( ) )) {
+        try (Connection conn = getConnection ();
+             PreparedStatement dl = conn.prepareStatement ("DELETE FROM student");
+             PreparedStatement ps = conn.prepareStatement ("INSERT INTO student (name,score) VALUE (?,?) ")) {
+            dl.executeUpdate();
             for (Student s : students) {
-                writer.write ( s.name + "," + s.score + "\n" );
+            ps.setString(1,s.name);
+            ps.setDouble(2,s.score);
+            ps.executeUpdate();
             }
-            System.out.println ( "录入成功" );
+
+
         } catch (Exception p) {
             System.out.println ( "录入失败" );
         }
@@ -55,18 +62,11 @@ public class Student {
     //读取数据
     public static ArrayList<Student> loadStudents () {
         ArrayList<Student> students = new ArrayList<> ( );
-        File file = dataFile ( );
-        if (!file.exists ( )) {
-            return students;
-        }
-        try (BufferedReader reader = new BufferedReader ( new FileReader ( file ) )) {
-            String line;
-            while ((line = reader.readLine ( )) != null) {
-                if (line.trim ( ).isEmpty ( )) continue;
-                String[] part = line.split ( "," );
-                String name = part[0].trim ( );
-                double score = Double.parseDouble ( part[1].trim ( ) );
-                students.add ( new Student ( name , score ) );
+
+        try (Connection conn =getConnection ();
+        ResultSet rs = conn.prepareStatement("SELECT name,score FROM student ").executeQuery()){
+            while (rs.next ()) {
+                students.add(  new Student( rs.getString("name") ,rs.getDouble("score" ) ));
             }
             System.out.println ( "读取到" + students.size ( ) + "个学生" );
         } catch (Exception l) {
@@ -82,9 +82,10 @@ public class Student {
     }
 
     //程序入口//
-    public static void main ( String[] args ) {
+    public static void main ( String[] args )  {
         ArrayList<Student> list = loadStudents ( );
         Scanner sc = new Scanner ( System.in );
+
 
         while (true) {
             System.out.println ( "这是菜单，输入数字即可执行操作" );
@@ -114,7 +115,9 @@ public class Student {
                             sc.nextLine ( );
                         }
                     }
-                    saveStudents ( list );
+                    System.out.println ("录入成功") ;
+                    saveStudents ( list ) ; 
+
                 } else if (choice == 2) {
                     System.out.println ( "列表大小：" + list.size ( ) );
                     for (Student i : list) {
@@ -122,9 +125,13 @@ public class Student {
                     }
 
                 } else if (choice == 3) {
-                    Collections.sort ( list , ( a , b ) -> Double.compare ( a.score , b.score ) );
-                    System.out.println ( list );
+                    Connection conn = getConnection ();
+                    ResultSet rs = conn.prepareStatement("SELECT name,score FROM student ORDER BY score DESC ").executeQuery() ;
+                    while(rs.next()) {
+                        System.out.println("姓名" + rs.getString("name") + "  分数" + rs.getDouble("score")) ;
+                    }
                     saveStudents ( list );
+                    conn.close();
                 } else if (choice == 4) {
                     System.exit ( 0 );
                 } else {
